@@ -1,3 +1,4 @@
+import * as fflate from 'fflate';
 import { GlobalEmscriptenModule } from "../types/emulator";
 import { ensureBrowserFS } from "./scriptLoader";
 
@@ -54,6 +55,16 @@ export function mountEmscriptenFS(Module: GlobalEmscriptenModule, coreId: string
       // Directories might already exist
     }
 
+    try {
+      if (FS.analyzePath && !FS.analyzePath("/system").exists) {
+        FS.mkdir?.("/system");
+      } else if (!FS.analyzePath) {
+        FS.mkdir?.("/system");
+      }
+    } catch {
+      // Directory might already exist
+    }
+
     const emscriptenFS = new BFS.EmscriptenFS(FS, Module.PATH, Module.ERRNO_CODES);
     try {
       FS.mount?.(emscriptenFS, { root: "/home" }, "/home");
@@ -75,7 +86,7 @@ export function cleanupVirtualFS(Module: GlobalEmscriptenModule) {
   if (!Module || !Module.FS) return;
   const FS = Module.FS;
 
-  const filesToRemove = ["/current_game.rom", "/game.rom"];
+  const filesToRemove = ["/current_game.rom", "/current_game.uze", "/game.rom"];
   for (const file of filesToRemove) {
     try {
       FS.unlink?.(file);
@@ -86,7 +97,8 @@ export function cleanupVirtualFS(Module: GlobalEmscriptenModule) {
 }
 
 export function writeRomToFS(Module: GlobalEmscriptenModule, fileData: ArrayBuffer, fileName: string): string {
-  const defaultRomPath = "/current_game.rom";
+  const ext = "." + fileName.split(".").pop()?.toLowerCase();
+  const defaultRomPath = (ext === ".uze" || ext === ".hex") ? "/current_game.uze" : "/current_game.rom";
   const targetPath = `/home/web_user/retroarch/userdata/content/${fileName}`;
   const dataView = new Uint8Array(fileData);
 
@@ -135,7 +147,11 @@ export async function loadAndStartCore(
   await initVirtualFileSystem();
 
   const corePath = `/home/web_user/retroarch/cores/${coreId}_libretro.core`;
-  const romPath = romData ? "/current_game.rom" : undefined;
+  let romPath: string | undefined = undefined;
+  if (romData) {
+    const ext = "." + romData.name.split(".").pop()?.toLowerCase();
+    romPath = (ext === ".uze" || ext === ".hex" || coreId === "uzem") ? "/current_game.uze" : "/current_game.rom";
+  }
 
   const args = romPath ? [romPath] : ["-v", "--menu"];
 
@@ -182,4 +198,68 @@ export async function loadAndStartCore(
   }
 
   return Module;
+}
+
+export function extractRomFromZip(
+  zipBuffer: ArrayBuffer,
+  supportedExtensions: string[]
+): { name: string; buffer: ArrayBuffer } {
+  const decompressed = fflate.unzipSync(new Uint8Array(zipBuffer));
+  const fileNames = Object.keys(decompressed);
+
+  if (fileNames.length === 0) {
+    throw new Error("The zip archive is empty.");
+  }
+
+  // Look for a file matching supported extensions
+  let targetFileName = fileNames.find((name) => {
+    const ext = "." + name.split(".").pop()?.toLowerCase();
+    return supportedExtensions.includes(ext);
+  });
+
+  // If no exact core match found, look for any known ROM extension or non-directory file
+  if (!targetFileName) {
+    targetFileName = fileNames.find((name) => !name.endsWith("/") && !name.startsWith("__MACOSX"));
+  }
+
+  if (!targetFileName) {
+    throw new Error("No valid ROM file found in the archive.");
+  }
+
+  const romUint8 = decompressed[targetFileName];
+  const romBuffer = romUint8.buffer.slice(
+    romUint8.byteOffset,
+    romUint8.byteOffset + romUint8.byteLength
+  ) as ArrayBuffer;
+
+  // Strip path prefix if any inside zip
+  const cleanName = targetFileName.split("/").pop() || targetFileName;
+
+  return {
+    name: cleanName,
+    buffer: romBuffer,
+  };
+}
+
+export function writeBiosToFS(Module: GlobalEmscriptenModule, fileData: ArrayBuffer, fileName: string): void {
+  if (!Module || !Module.FS) return;
+  const FS = Module.FS;
+
+  try {
+    if (FS.analyzePath && !FS.analyzePath("/system").exists) {
+      FS.mkdir?.("/system");
+    } else if (!FS.analyzePath) {
+      try { FS.mkdir?.("/system"); } catch {}
+    }
+  } catch {}
+
+  const dataView = new Uint8Array(fileData);
+  const targetPath = `/system/${fileName}`;
+
+  try {
+    FS.writeFile?.(targetPath, dataView);
+    console.log(`Successfully mounted BIOS file: ${targetPath}`);
+  } catch (err) {
+    console.error(`Failed to write BIOS ${fileName} to /system:`, err);
+  }
 }

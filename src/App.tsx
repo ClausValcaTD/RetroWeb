@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { EmulatorView } from './components/EmulatorView';
 import { TouchControls } from './components/TouchControls';
 import { EmulatorStatus } from './types/emulator';
-import { loadAndStartCore } from './utils/emulatorRunner';
+import { loadAndStartCore, extractRomFromZip, writeBiosToFS } from './utils/emulatorRunner';
 import { SUPPORTED_CORES } from './constants/cores';
 
 export default function App() {
@@ -63,14 +63,43 @@ export default function App() {
     [romFile, startEmulator]
   );
 
-  const handleRomSelect = useCallback(
+
+  const handleBiosSelect = useCallback(
     async (file: File) => {
       try {
         const buffer = await file.arrayBuffer();
-        const romData = { name: file.name, buffer };
+        if (window.Module) {
+          writeBiosToFS(window.Module, buffer, file.name);
+          alert(`BIOS file "${file.name}" uploaded to /system directory.`);
+        } else {
+          alert(`BIOS file "${file.name}" will be mounted into /system directory when core starts.`);
+        }
+      } catch (err: any) {
+        console.error('Failed to read BIOS file:', err);
+        setErrorMessage('Failed to read BIOS file.');
+      }
+    },
+    []
+  );
+
+  const handleRomSelect = useCallback(
+    async (file: File) => {
+      try {
+        let buffer = await file.arrayBuffer();
+        let fileName = file.name;
+        let fileExt = '.' + fileName.split('.').pop()?.toLowerCase();
+
+        if (fileExt === '.zip') {
+          const allSupportedExtensions = SUPPORTED_CORES.flatMap((c) => c.extensions);
+          const extracted = extractRomFromZip(buffer, allSupportedExtensions);
+          fileName = extracted.name;
+          buffer = extracted.buffer;
+          fileExt = '.' + fileName.split('.').pop()?.toLowerCase();
+        }
+
+        const romData = { name: fileName, buffer };
         setRomFile(romData);
 
-        const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
         const matchingCore = SUPPORTED_CORES.find((c) => c.extensions.includes(fileExt));
 
         const targetCoreId = matchingCore ? matchingCore.id : currentCoreId;
@@ -141,6 +170,7 @@ export default function App() {
         status={status}
         romName={romFile ? romFile.name : null}
         onRomSelect={handleRomSelect}
+        onBiosSelect={handleBiosSelect}
         onPauseToggle={handlePauseToggle}
         onReset={handleReset}
         onFullscreenToggle={handleFullscreenToggle}
