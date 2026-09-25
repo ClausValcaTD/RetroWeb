@@ -5,7 +5,7 @@ import { TouchControls } from './components/TouchControls';
 import { GameLibrary } from './components/GameLibrary';
 import { InGameHUD } from './components/InGameHUD';
 import { EmulatorStatus } from './types/emulator';
-import { loadAndStartCore } from './utils/emulatorRunner';
+import { loadAndStartCore, extractRomFromZip, writeBiosToFS } from './utils/emulatorRunner';
 import { SUPPORTED_CORES } from './constants/cores';
 import {
   Game,
@@ -126,28 +126,44 @@ export default function App() {
     [currentCoreId, refreshGames, startEmulator]
   );
 
-  const handleSelectGame = useCallback(
-    async (game: Game) => {
-      if (!game.id) return;
+  const handleBiosSelect = useCallback(
+    async (file: File) => {
       try {
-        await updateGameLastPlayed(game.id);
-        await refreshGames();
+        const buffer = await file.arrayBuffer();
+        if (window.Module) {
+          writeBiosToFS(window.Module, buffer, file.name);
+          alert(`BIOS file "${file.name}" uploaded to /system directory.`);
+        } else {
+          alert(`BIOS file "${file.name}" will be mounted into /system directory when core starts.`);
+        }
+      } catch (err: any) {
+        console.error('Failed to read BIOS file:', err);
+        setErrorMessage('Failed to read BIOS file.');
+      }
+    },
+    []
+  );
 
-        setActiveGame(game);
-        setCurrentCoreId(game.coreId);
-        const romData = { name: game.originalFilename, buffer: game.romData };
+  const handleRomSelect = useCallback(
+    async (file: File) => {
+      try {
+        let buffer = await file.arrayBuffer();
+        let fileName = file.name;
+        let fileExt = '.' + fileName.split('.').pop()?.toLowerCase();
+
+        if (fileExt === '.zip') {
+          const allSupportedExtensions = SUPPORTED_CORES.flatMap((c) => c.extensions);
+          const extracted = extractRomFromZip(buffer, allSupportedExtensions);
+          fileName = extracted.name;
+          buffer = extracted.buffer;
+          fileExt = '.' + fileName.split('.').pop()?.toLowerCase();
+        }
+
+        const romData = { name: fileName, buffer };
         setRomFile(romData);
         setViewMode('emulator');
 
-        setTimeout(() => {
-          startEmulator(game.coreId, romData);
-        }, 100);
-      } catch (err) {
-        console.error('Failed to launch selected game:', err);
-      }
-    },
-    [refreshGames, startEmulator]
-  );
+        const matchingCore = SUPPORTED_CORES.find((c) => c.extensions.includes(fileExt));
 
   const handleDeleteGame = useCallback(
     async (id: number) => {
@@ -234,12 +250,27 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-zinc-950 text-zinc-100 font-sans select-none overflow-hidden">
-      {viewMode === 'library' ? (
-        <GameLibrary
-          games={games}
-          onSelectGame={handleSelectGame}
-          onImportFile={handleImportFile}
-          onDeleteGame={handleDeleteGame}
+      <Header
+        currentCoreId={currentCoreId}
+        onSelectCore={handleSelectCore}
+        status={status}
+        romName={romFile ? romFile.name : null}
+        onRomSelect={handleRomSelect}
+        onBiosSelect={handleBiosSelect}
+        onPauseToggle={handlePauseToggle}
+        onReset={handleReset}
+        onFullscreenToggle={handleFullscreenToggle}
+        showTouchControls={showTouchControls}
+        onToggleTouchControls={handleToggleTouchControls}
+      />
+
+      <main className="flex-1 flex items-center justify-center relative bg-gradient-to-b from-zinc-950 via-zinc-900/50 to-zinc-950 overflow-hidden">
+        <EmulatorView
+          currentCoreId={currentCoreId}
+          romFile={romFile}
+          status={status}
+          onRomSelect={handleRomSelect}
+          errorMessage={errorMessage}
         />
       ) : (
         <>

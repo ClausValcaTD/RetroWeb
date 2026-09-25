@@ -9,6 +9,7 @@ interface HeaderProps {
   status: EmulatorStatus;
   romName: string | null;
   onRomSelect: (file: File) => void;
+  onBiosSelect?: (file: File) => void;
   onPauseToggle: () => void;
   onReset: () => void;
   onFullscreenToggle: () => void;
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   status,
   romName,
   onRomSelect,
+  onBiosSelect,
   onPauseToggle,
   onReset,
   onFullscreenToggle,
@@ -29,6 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTouchControls,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const biosInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeCore = SUPPORTED_CORES.find((c) => c.id === currentCoreId) || SUPPORTED_CORES[0];
 
@@ -71,6 +74,13 @@ export const Header: React.FC<HeaderProps> = ({
             Ready
           </span>
         );
+    }
+  };
+
+
+  const handleBiosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0 && onBiosSelect) {
+      onBiosSelect(e.target.files[0]);
     }
   };
 
@@ -129,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept={activeCore.extensions.join(',')}
+          accept={[...activeCore.extensions, '.zip'].join(',')}
           onChange={handleFileChange}
         />
 
@@ -141,6 +151,24 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Upload className="w-3.5 h-3.5 text-cyan-400" />
           <span className="hidden md:inline">Open ROM</span>
+        </button>
+
+        {/* Hidden BIOS Input */}
+        <input
+          ref={biosInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleBiosChange}
+        />
+
+        {/* Upload BIOS Button */}
+        <button
+          onClick={() => biosInputRef.current?.click()}
+          title="Upload BIOS to /system"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 rounded-lg text-xs font-medium transition cursor-pointer active:scale-95"
+        >
+          <Cpu className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden md:inline">Upload BIOS</span>
         </button>
 
         {/* Touch Controls Toggle */}

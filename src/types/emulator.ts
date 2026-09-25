@@ -25,6 +25,7 @@ export interface GlobalEmscriptenModule {
     readFile?: (path: string, opts?: any) => Uint8Array;
     unlink?: (path: string) => void;
     createDataFile?: (parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean) => void;
+    analyzePath?: (path: string) => { exists: boolean; [key: string]: any };
   };
   PATH?: any;
   ERRNO_CODES?: any;
