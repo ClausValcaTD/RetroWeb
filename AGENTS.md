@@ -1,17 +1,12 @@
-# RetroWeb - Project Architecture & Jules Guidelines
+# RetroWeb - Development Guide for Jules
 
-## Overview
-RetroWeb is a modern, open-source, self-hosted web-based retro game emulator (PWA) inspired by Afterplay, running on WebAssembly (WASM).
+## Architecture
+- Modern Web-based Retro Emulator frontend inspired by Afterplay / modern streaming platforms.
+- Stack: Vite + React + Tailwind CSS.
+- Emulation Layer: Precompiled Libretro Emscripten cores located in `/public/emulator/`.
+- Virtual File System: Managed via BrowserFS and IndexedDB.
 
-## Tech Stack
-- Frontend: Vite + React (or Svelte) + Tailwind CSS + Lucide Icons
-- Emulation: Libretro WASM cores (using Nostalgist.js or libretro-emscripten runtime)
-- Storage: IndexedDB for local saves and ROM caching
-- PWA: Service Worker for full offline capabilities
-- Touch: Virtual on-screen touch controller overlay for mobile
-
-## Rules for Jules:
-1. Do NOT attempt to compile the entire RetroArch C codebase.
-2. Rely on pre-compiled Libretro WASM cores / Nostalgist engine for running games on Canvas.
-3. Focus PRs on clean UI/UX, responsive mobile design, touch controls, and save-state syncing.
-4. Keep the codebase modular and well-documented.
+## Core Rules
+1. Do NOT try to build/compile C/C++ or use Emscripten. All binaries (.wasm, .js) are precompiled in `/public/emulator/`.
+2. Keep the UI clean, mobile-first, and responsive.
+3. Build modular React components (Canvas viewport, Header, Game Library grid, On-screen controls).
