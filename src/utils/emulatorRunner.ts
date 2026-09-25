@@ -1,5 +1,5 @@
-import { GlobalEmscriptenModule } from '../types/emulator';
-import { ensureBrowserFS } from './scriptLoader';
+import { GlobalEmscriptenModule } from "../types/emulator";
+import { ensureBrowserFS } from "./scriptLoader";
 
 let isFSInitialized = false;
 
@@ -28,9 +28,9 @@ export async function initVirtualFileSystem() {
   const inMemoryCores = new BFS.FileSystem.InMemory();
   const inMemoryRoot = new BFS.FileSystem.InMemory();
 
-  mfs.mount('/home/web_user/retroarch', inMemoryRoot);
-  mfs.mount('/home/web_user/retroarch/cores', inMemoryCores);
-  mfs.mount('/home/web_user/retroarch/userdata', asyncFs || new BFS.FileSystem.InMemory());
+  mfs.mount("/home/web_user/retroarch", inMemoryRoot);
+  mfs.mount("/home/web_user/retroarch/cores", inMemoryCores);
+  mfs.mount("/home/web_user/retroarch/userdata", asyncFs || new BFS.FileSystem.InMemory());
 
   BFS.initialize(mfs);
   isFSInitialized = true;
@@ -45,18 +45,18 @@ export function mountEmscriptenFS(Module: GlobalEmscriptenModule, coreId: string
 
   try {
     try {
-      FS.mkdir?.('/home');
-      FS.mkdir?.('/home/web_user');
-      FS.mkdir?.('/home/web_user/retroarch');
-      FS.mkdir?.('/home/web_user/retroarch/userdata');
-      FS.mkdir?.('/home/web_user/retroarch/userdata/content');
+      FS.mkdir?.("/home");
+      FS.mkdir?.("/home/web_user");
+      FS.mkdir?.("/home/web_user/retroarch");
+      FS.mkdir?.("/home/web_user/retroarch/userdata");
+      FS.mkdir?.("/home/web_user/retroarch/userdata/content");
     } catch {
       // Directories might already exist
     }
 
     const emscriptenFS = new BFS.EmscriptenFS(FS, Module.PATH, Module.ERRNO_CODES);
     try {
-      FS.mount?.(emscriptenFS, { root: '/home' }, '/home');
+      FS.mount?.(emscriptenFS, { root: "/home" }, "/home");
     } catch {
       // Might already be mounted
     }
@@ -71,24 +71,48 @@ export function mountEmscriptenFS(Module: GlobalEmscriptenModule, coreId: string
   }
 }
 
+export function cleanupVirtualFS(Module: GlobalEmscriptenModule) {
+  if (!Module || !Module.FS) return;
+  const FS = Module.FS;
+
+  const filesToRemove = ["/current_game.rom", "/game.rom"];
+  for (const file of filesToRemove) {
+    try {
+      FS.unlink?.(file);
+    } catch {
+      // Ignore if file does not exist
+    }
+  }
+}
+
 export function writeRomToFS(Module: GlobalEmscriptenModule, fileData: ArrayBuffer, fileName: string): string {
+  const defaultRomPath = "/current_game.rom";
   const targetPath = `/home/web_user/retroarch/userdata/content/${fileName}`;
   const dataView = new Uint8Array(fileData);
 
   if (Module.FS) {
     const FS = Module.FS;
+
+    cleanupVirtualFS(Module);
+
     try {
-      try { FS.mkdir?.('/home'); } catch {}
-      try { FS.mkdir?.('/home/web_user'); } catch {}
-      try { FS.mkdir?.('/home/web_user/retroarch'); } catch {}
-      try { FS.mkdir?.('/home/web_user/retroarch/userdata'); } catch {}
-      try { FS.mkdir?.('/home/web_user/retroarch/userdata/content'); } catch {}
+      FS.writeFile?.(defaultRomPath, dataView);
+    } catch (err) {
+      console.warn("Failed to write directly to /current_game.rom:", err);
+    }
+
+    try {
+      try { FS.mkdir?.("/home"); } catch {}
+      try { FS.mkdir?.("/home/web_user"); } catch {}
+      try { FS.mkdir?.("/home/web_user/retroarch"); } catch {}
+      try { FS.mkdir?.("/home/web_user/retroarch/userdata"); } catch {}
+      try { FS.mkdir?.("/home/web_user/retroarch/userdata/content"); } catch {}
 
       FS.writeFile?.(targetPath, dataView);
     } catch (err) {
       console.error("Failed to write ROM to Emscripten FS:", err);
       try {
-        FS.createDataFile?.('/', fileName, dataView, true, true);
+        FS.createDataFile?.("/", fileName, dataView, true, true);
         const readData = FS.readFile?.(fileName);
         if (readData) {
           FS.writeFile?.(targetPath, readData);
@@ -99,7 +123,7 @@ export function writeRomToFS(Module: GlobalEmscriptenModule, fileData: ArrayBuff
       }
     }
   }
-  return targetPath;
+  return defaultRomPath;
 }
 
 export async function loadAndStartCore(
@@ -111,11 +135,9 @@ export async function loadAndStartCore(
   await initVirtualFileSystem();
 
   const corePath = `/home/web_user/retroarch/cores/${coreId}_libretro.core`;
-  const romPath = romData ? `/home/web_user/retroarch/userdata/content/${romData.name}` : undefined;
+  const romPath = romData ? "/current_game.rom" : undefined;
 
-  const args = romPath
-    ? ["-v", romPath]
-    : ["-v", "--menu"];
+  const args = romPath ? [romPath] : ["-v", "--menu"];
 
   const ModuleBase: GlobalEmscriptenModule = {
     noInitialRun: true,
@@ -150,10 +172,13 @@ export async function loadAndStartCore(
 
   if (romData) {
     writeRomToFS(Module, romData.buffer, romData.name);
+    Module.arguments = [romPath!];
+  } else {
+    Module.arguments = args;
   }
 
   if (Module.callMain) {
-    Module.callMain(Module.arguments || args);
+    Module.callMain(Module.arguments);
   }
 
   return Module;
