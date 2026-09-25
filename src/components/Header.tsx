@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Gamepad2, Upload, Play, Pause, RotateCcw, Maximize, Cpu } from 'lucide-react';
+import { Gamepad2, Upload, Play, Pause, RotateCcw, Maximize, Cpu, Smartphone } from 'lucide-react';
 import { SUPPORTED_CORES } from '../constants/cores';
 import { EmulatorStatus } from '../types/emulator';
 
@@ -12,6 +12,8 @@ interface HeaderProps {
   onPauseToggle: () => void;
   onReset: () => void;
   onFullscreenToggle: () => void;
+  showTouchControls: boolean;
+  onToggleTouchControls: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +25,8 @@ export const Header: React.FC<HeaderProps> = ({
   onPauseToggle,
   onReset,
   onFullscreenToggle,
+  showTouchControls,
+  onToggleTouchControls,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -137,6 +141,19 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Upload className="w-3.5 h-3.5 text-cyan-400" />
           <span className="hidden md:inline">Open ROM</span>
+        </button>
+
+        {/* Touch Controls Toggle */}
+        <button
+          onClick={onToggleTouchControls}
+          title={showTouchControls ? 'Hide Touch Controls' : 'Show Touch Controls'}
+          className={`p-1.5 bg-zinc-900 hover:bg-zinc-800 border rounded-lg text-xs font-medium transition cursor-pointer active:scale-95 ${
+            showTouchControls
+              ? 'border-cyan-500/50 text-cyan-400 bg-cyan-950/30'
+              : 'border-zinc-800 text-zinc-400'
+          }`}
+        >
+          <Smartphone className="w-4 h-4" />
         </button>
 
         {/* Pause / Play toggle */}

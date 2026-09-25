@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { EmulatorView } from './components/EmulatorView';
+import { TouchControls } from './components/TouchControls';
 import { EmulatorStatus } from './types/emulator';
 import { loadAndStartCore } from './utils/emulatorRunner';
 import { SUPPORTED_CORES } from './constants/cores';
@@ -10,6 +11,13 @@ export default function App() {
   const [status, setStatus] = useState<EmulatorStatus>('idle');
   const [romFile, setRomFile] = useState<{ name: string; buffer: ArrayBuffer } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showTouchControls, setShowTouchControls] = useState<boolean>(false);
+
+  useEffect(() => {
+    const isTouchDevice =
+      'ontouchstart' in window || navigator.maxTouchPoints > 0 || (navigator as any).msMaxTouchPoints > 0;
+    setShowTouchControls(isTouchDevice);
+  }, []);
 
   const startEmulator = useCallback(
     async (coreId: string, romData?: { name: string; buffer: ArrayBuffer }) => {
@@ -121,6 +129,10 @@ export default function App() {
     }
   }, []);
 
+  const handleToggleTouchControls = useCallback(() => {
+    setShowTouchControls((prev) => !prev);
+  }, []);
+
   return (
     <div className="flex flex-col h-screen w-screen bg-zinc-950 text-zinc-100 font-sans select-none overflow-hidden">
       <Header
@@ -132,9 +144,11 @@ export default function App() {
         onPauseToggle={handlePauseToggle}
         onReset={handleReset}
         onFullscreenToggle={handleFullscreenToggle}
+        showTouchControls={showTouchControls}
+        onToggleTouchControls={handleToggleTouchControls}
       />
 
-      <main className="flex-1 flex items-center justify-center relative bg-gradient-to-b from-zinc-950 via-zinc-900/50 to-zinc-950">
+      <main className="flex-1 flex items-center justify-center relative bg-gradient-to-b from-zinc-950 via-zinc-900/50 to-zinc-950 overflow-hidden">
         <EmulatorView
           currentCoreId={currentCoreId}
           romFile={romFile}
@@ -142,6 +156,8 @@ export default function App() {
           onRomSelect={handleRomSelect}
           errorMessage={errorMessage}
         />
+
+        {showTouchControls && <TouchControls />}
       </main>
     </div>
   );
