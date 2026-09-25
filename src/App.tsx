@@ -164,6 +164,36 @@ export default function App() {
         setViewMode('emulator');
 
         const matchingCore = SUPPORTED_CORES.find((c) => c.extensions.includes(fileExt));
+        const coreId = matchingCore ? matchingCore.id : currentCoreId;
+        setCurrentCoreId(coreId);
+
+        setTimeout(() => {
+          startEmulator(coreId, romData);
+        }, 100);
+      } catch (err: any) {
+        console.error('Failed to select ROM:', err);
+        setErrorMessage('Failed to read ROM file.');
+      }
+    },
+    [currentCoreId, startEmulator]
+  );
+
+  const handleSelectGame = useCallback(
+    (game: Game) => {
+      setActiveGame(game);
+      setCurrentCoreId(game.coreId);
+      setRomFile({ name: game.originalFilename, buffer: game.romData });
+      setViewMode('emulator');
+      if (game.id) {
+        updateGameLastPlayed(game.id).then(() => refreshGames());
+      }
+
+      setTimeout(() => {
+        startEmulator(game.coreId, { name: game.originalFilename, buffer: game.romData });
+      }, 100);
+    },
+    [refreshGames, startEmulator]
+  );
 
   const handleDeleteGame = useCallback(
     async (id: number) => {
@@ -250,27 +280,12 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-zinc-950 text-zinc-100 font-sans select-none overflow-hidden">
-      <Header
-        currentCoreId={currentCoreId}
-        onSelectCore={handleSelectCore}
-        status={status}
-        romName={romFile ? romFile.name : null}
-        onRomSelect={handleRomSelect}
-        onBiosSelect={handleBiosSelect}
-        onPauseToggle={handlePauseToggle}
-        onReset={handleReset}
-        onFullscreenToggle={handleFullscreenToggle}
-        showTouchControls={showTouchControls}
-        onToggleTouchControls={handleToggleTouchControls}
-      />
-
-      <main className="flex-1 flex items-center justify-center relative bg-gradient-to-b from-zinc-950 via-zinc-900/50 to-zinc-950 overflow-hidden">
-        <EmulatorView
-          currentCoreId={currentCoreId}
-          romFile={romFile}
-          status={status}
-          onRomSelect={handleRomSelect}
-          errorMessage={errorMessage}
+      {viewMode === 'library' ? (
+        <GameLibrary
+          games={games}
+          onSelectGame={handleSelectGame}
+          onImportFile={handleImportFile}
+          onDeleteGame={handleDeleteGame}
         />
       ) : (
         <>
@@ -279,7 +294,8 @@ export default function App() {
             onSelectCore={handleSelectCore}
             status={status}
             romName={romFile ? romFile.name : activeGame?.title || null}
-            onRomSelect={handleImportFile}
+            onRomSelect={handleRomSelect}
+            onBiosSelect={handleBiosSelect}
             onPauseToggle={handlePauseToggle}
             onReset={handleReset}
             onFullscreenToggle={handleFullscreenToggle}
@@ -303,7 +319,7 @@ export default function App() {
               currentCoreId={currentCoreId}
               romFile={romFile}
               status={status}
-              onRomSelect={handleImportFile}
+              onRomSelect={handleRomSelect}
               errorMessage={errorMessage}
             />
 
