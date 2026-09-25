@@ -5,7 +5,7 @@ export const SUPPORTED_CORES: CoreInfo[] = [
     id: 'uzem',
     name: 'Uzebox (Uzem)',
     system: 'Uzebox',
-    extensions: ['.uze', '.hex', '.bin'],
+    extensions: ['.uze', '.hex'],
     aspectRatio: '4:3',
   },
   {

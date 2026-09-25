@@ -79,7 +79,7 @@ export const EmulatorView: React.FC<EmulatorViewProps> = ({
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept={activeCore.extensions.join(',')}
+          accept={[...activeCore.extensions, '.zip'].join(',')}
           onChange={handleFileInputChange}
         />
 
@@ -128,7 +128,7 @@ export const EmulatorView: React.FC<EmulatorViewProps> = ({
                     {romFile ? romFile.name : `Load a ${activeCore.system} ROM`}
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    Drag and drop your <span className="font-mono text-cyan-400">{activeCore.extensions.join(', ')}</span> file here, or browse from your device.
+                    Drag and drop your <span className="font-mono text-cyan-400">{[...activeCore.extensions, '.zip'].join(', ')}</span> file here, or browse from your device.
                   </p>
                 </div>
 
