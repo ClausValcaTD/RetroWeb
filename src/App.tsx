@@ -1,28 +1,28 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Header } from './components/Header';
-import { EmulatorView } from './components/EmulatorView';
-import { TouchControls } from './components/TouchControls';
-import { GameLibrary } from './components/GameLibrary';
-import { InGameHUD } from './components/InGameHUD';
-import { EmulatorStatus } from './types/emulator';
-import { loadAndStartCore, extractRomFromZip, writeBiosToFS } from './utils/emulatorRunner';
-import { SUPPORTED_CORES } from './constants/cores';
+import { useState, useCallback, useEffect } from "react";
+import { Header } from "./components/Header";
+import { EmulatorView } from "./components/EmulatorView";
+import { TouchControls } from "./components/TouchControls";
+import { GameLibrary } from "./components/GameLibrary";
+import { InGameHUD } from "./components/InGameHUD";
+import { EmulatorStatus } from "./types/emulator";
+import { extractRomFromZip, writeBiosToFS } from "./utils/emulatorRunner";
+import { SUPPORTED_CORES } from "./constants/cores";
 import {
   Game,
   getAllGames,
   addGameToDb,
   deleteGameFromDb,
   updateGameLastPlayed,
-} from './db';
-import { cleanRomTitle, getBoxArtUrl } from './utils/boxArt';
+} from "./db";
+import { cleanRomTitle, getBoxArtUrl } from "./utils/boxArt";
 
 export default function App() {
-  const [currentCoreId, setCurrentCoreId] = useState<string>('uzem');
-  const [status, setStatus] = useState<EmulatorStatus>('idle');
+  const [currentCoreId, setCurrentCoreId] = useState<string>("uzem");
+  const [status, setStatus] = useState<EmulatorStatus>("idle");
   const [romFile, setRomFile] = useState<{ name: string; buffer: ArrayBuffer } | null>(null);
   const [activeGame, setActiveGame] = useState<Game | null>(null);
   const [games, setGames] = useState<Game[]>([]);
-  const [viewMode, setViewMode] = useState<'library' | 'emulator'>('library');
+  const [viewMode, setViewMode] = useState<"library" | "emulator">("library");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showTouchControls, setShowTouchControls] = useState<boolean>(false);
 
@@ -32,7 +32,7 @@ export default function App() {
       const storedGames = await getAllGames();
       setGames(storedGames);
     } catch (err) {
-      console.error('Failed to load games from Dexie:', err);
+      console.error("Failed to load games from Dexie:", err);
     }
   }, []);
 
@@ -40,37 +40,25 @@ export default function App() {
     refreshGames();
 
     const isTouchDevice =
-      'ontouchstart' in window || navigator.maxTouchPoints > 0 || (navigator as any).msMaxTouchPoints > 0;
+      "ontouchstart" in window || navigator.maxTouchPoints > 0 || (navigator as any).msMaxTouchPoints > 0;
     setShowTouchControls(isTouchDevice);
   }, [refreshGames]);
 
   const startEmulator = useCallback(
     async (coreId: string, romData?: { name: string; buffer: ArrayBuffer }) => {
-      setStatus('loading');
+      setStatus("loading");
       setErrorMessage(null);
 
       try {
-        const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-        if (!canvas) {
-          throw new Error('Canvas element not found in DOM');
+        if (romData) {
+          setRomFile(romData);
         }
-
-        await loadAndStartCore(
-          coreId,
-          canvas,
-          romData,
-          (log, isErr) => {
-            if (isErr && log.includes('Error')) {
-              console.error('Emscripten Error:', log);
-            }
-          }
-        );
-
-        setStatus('running');
+        setCurrentCoreId(coreId);
+        setStatus("running");
       } catch (err: any) {
-        console.error('Failed to launch emulator:', err);
-        setErrorMessage(err.message || 'Error initializing emulator core.');
-        setStatus('error');
+        console.error("Failed to launch emulator:", err);
+        setErrorMessage(err.message || "Error initializing emulator core.");
+        setStatus("error");
       }
     },
     []
@@ -80,7 +68,7 @@ export default function App() {
     async (file: File) => {
       try {
         const buffer = await file.arrayBuffer();
-        const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+        const fileExt = "." + file.name.split(".").pop()?.toLowerCase();
         const matchingCore = SUPPORTED_CORES.find((c) => c.extensions.includes(fileExt));
         const coreId = matchingCore ? matchingCore.id : currentCoreId;
 
@@ -112,15 +100,14 @@ export default function App() {
         setActiveGame(storedGame);
         setCurrentCoreId(coreId);
         setRomFile({ name: file.name, buffer });
-        setViewMode('emulator');
+        setViewMode("emulator");
 
-        // Launch emulator
         setTimeout(() => {
           startEmulator(coreId, { name: file.name, buffer });
         }, 100);
       } catch (err: any) {
-        console.error('Failed to import file:', err);
-        setErrorMessage('Failed to read or store ROM file.');
+        console.error("Failed to import file:", err);
+        setErrorMessage("Failed to read or store ROM file.");
       }
     },
     [currentCoreId, refreshGames, startEmulator]
@@ -137,8 +124,8 @@ export default function App() {
           alert(`BIOS file "${file.name}" will be mounted into /system directory when core starts.`);
         }
       } catch (err: any) {
-        console.error('Failed to read BIOS file:', err);
-        setErrorMessage('Failed to read BIOS file.');
+        console.error("Failed to read BIOS file:", err);
+        setErrorMessage("Failed to read BIOS file.");
       }
     },
     []
@@ -149,19 +136,19 @@ export default function App() {
       try {
         let buffer = await file.arrayBuffer();
         let fileName = file.name;
-        let fileExt = '.' + fileName.split('.').pop()?.toLowerCase();
+        let fileExt = "." + fileName.split(".").pop()?.toLowerCase();
 
-        if (fileExt === '.zip') {
+        if (fileExt === ".zip") {
           const allSupportedExtensions = SUPPORTED_CORES.flatMap((c) => c.extensions);
           const extracted = extractRomFromZip(buffer, allSupportedExtensions);
           fileName = extracted.name;
           buffer = extracted.buffer;
-          fileExt = '.' + fileName.split('.').pop()?.toLowerCase();
+          fileExt = "." + fileName.split(".").pop()?.toLowerCase();
         }
 
         const romData = { name: fileName, buffer };
         setRomFile(romData);
-        setViewMode('emulator');
+        setViewMode("emulator");
 
         const matchingCore = SUPPORTED_CORES.find((c) => c.extensions.includes(fileExt));
         const coreId = matchingCore ? matchingCore.id : currentCoreId;
@@ -171,8 +158,8 @@ export default function App() {
           startEmulator(coreId, romData);
         }, 100);
       } catch (err: any) {
-        console.error('Failed to select ROM:', err);
-        setErrorMessage('Failed to read ROM file.');
+        console.error("Failed to select ROM:", err);
+        setErrorMessage("Failed to read ROM file.");
       }
     },
     [currentCoreId, startEmulator]
@@ -183,7 +170,7 @@ export default function App() {
       setActiveGame(game);
       setCurrentCoreId(game.coreId);
       setRomFile({ name: game.originalFilename, buffer: game.romData });
-      setViewMode('emulator');
+      setViewMode("emulator");
       if (game.id) {
         updateGameLastPlayed(game.id).then(() => refreshGames());
       }
@@ -203,11 +190,11 @@ export default function App() {
         if (activeGame?.id === id) {
           setActiveGame(null);
           setRomFile(null);
-          setStatus('idle');
-          setViewMode('library');
+          setStatus("idle");
+          setViewMode("library");
         }
       } catch (err) {
-        console.error('Failed to delete game:', err);
+        console.error("Failed to delete game:", err);
       }
     },
     [activeGame, refreshGames]
@@ -219,49 +206,31 @@ export default function App() {
       if (romFile) {
         startEmulator(coreId, romFile);
       } else {
-        setStatus('ready');
+        setStatus("ready");
       }
     },
     [romFile, startEmulator]
   );
 
   const handlePauseToggle = useCallback(() => {
-    if (!window.Module) return;
-
-    if (status === 'running') {
-      if (window.Module._cmd_pause) {
-        window.Module._cmd_pause();
-      } else if (window.Module.retroArchSend) {
-        window.Module.retroArchSend('PAUSE_TOGGLE');
-      }
-      setStatus('paused');
-    } else if (status === 'paused') {
-      if (window.Module._cmd_unpause) {
-        window.Module._cmd_unpause();
-      } else if (window.Module.retroArchSend) {
-        window.Module.retroArchSend('PAUSE_TOGGLE');
-      }
-      setStatus('running');
+    if (status === "running") {
+      setStatus("paused");
+    } else if (status === "paused") {
+      setStatus("running");
     }
   }, [status]);
 
   const handleReset = useCallback(() => {
-    if (!window.Module) return;
-
-    if (window.Module._cmd_reset) {
-      window.Module._cmd_reset();
-    } else if (window.Module.retroArchSend) {
-      window.Module.retroArchSend('RESET');
-    }
+    // Reset handler for UI state
   }, []);
 
   const handleFullscreenToggle = useCallback(() => {
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    if (canvas) {
+    const gameContainer = document.getElementById("game");
+    if (gameContainer) {
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       } else {
-        canvas.requestFullscreen().catch(() => {});
+        gameContainer.requestFullscreen().catch(() => {});
       }
     }
   }, []);
@@ -271,16 +240,15 @@ export default function App() {
   }, []);
 
   const handleBackToLibrary = useCallback(() => {
-    // Pause execution when switching back to library
-    if (status === 'running') {
+    if (status === "running") {
       handlePauseToggle();
     }
-    setViewMode('library');
+    setViewMode("library");
   }, [handlePauseToggle, status]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-zinc-950 text-zinc-100 font-sans select-none overflow-hidden">
-      {viewMode === 'library' ? (
+      {viewMode === "library" ? (
         <GameLibrary
           games={games}
           onSelectGame={handleSelectGame}
